@@ -1266,5 +1266,74 @@
             }
         }
     </script>
+    <!-- ... Todo el contenido HTML de tu Dashboard (Botones, Tablas, Gráficos) va aquí arriba ... -->
+
+    <!-- Carga de librerías como Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- AQUÍ VA TU CÓDIGO JAVASCRIPT Y LA FUNCIÓN DE TELEGRAM -->
+    <script>
+      // 1. Funciones de guardar y cargar Token/Chat ID
+      function guardarConfigTelegram() {
+        const token = document.getElementById('tgTokenInput').value.trim();
+        const chatId = document.getElementById('tgChatIdInput').value.trim();
+
+        if (!token || !chatId) {
+          alert('Por favor ingresa tanto el Bot Token como el Chat ID.');
+          return;
+        }
+
+        localStorage.setItem('tg_bot_token', token);
+        localStorage.setItem('tg_chat_id', chatId);
+
+        alert('¡Configuración de Telegram guardada correctamente!');
+        probarConexionTelegram();
+      }
+
+      // 2. Función principal para enviar notificaciones a Telegram
+      async function enviarNotificacionTelegram(mensaje) {
+        const token = localStorage.getItem('tg_bot_token');
+        const chatId = localStorage.getItem('tg_chat_id');
+
+        if (!token || !chatId) {
+          console.warn('Telegram no está configurado en localStorage.');
+          return;
+        }
+
+        const url = `https://api.telegram.org/bot${token}/sendMessage`;
+
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: mensaje,
+              parse_mode: 'Markdown'
+            })
+          });
+
+          const data = await response.json();
+          if (data.ok) {
+            console.log('✅ Mensaje enviado a Telegram con éxito');
+          } else {
+            console.error('❌ Error de Telegram:', data.description);
+          }
+        } catch (error) {
+          console.error('❌ Error de red al conectar con Telegram:', error);
+        }
+      }
+
+      // 3. Función para probar la conexión
+      function probarConexionTelegram() {
+        enviarNotificacionTelegram(
+          '🚀 *¡Conexión Exitosa!*\n\nTu Dashboard para el *Reto Actinver* ya está vinculado correctamente a este chat.'
+        );
+      }
+
+      // ... El resto de la lógica de tu Dashboard (gráficos, P&L, screener, etc.) ...
+    </script>
+  </body>
+</html>
 </body>
 </html>

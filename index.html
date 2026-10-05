@@ -1,4 +1,241 @@
-<!-- Script de Integración con Yahoo Finance API y Telegram -->
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Algorítmico - Reto Actinver</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            navy: '#0b132b',
+                            card: '#1c2541',
+                            accent: '#3a506b',
+                            cyan: '#00b4d8',
+                            emerald: '#10b981',
+                            rose: '#f43f5e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+    <!-- HEADER / NAVBAR -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-chart-line text-cyan-400 text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wide text-white">Reto Actinver <span class="text-xs text-cyan-400 font-normal border border-cyan-500/30 bg-cyan-950/50 px-2 py-0.5 rounded">Trading Bot</span></h1>
+            </div>
+            <div class="flex items-center space-x-4 text-sm">
+                <button onclick="openTelegramModal()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                    <i class="fa-brands fa-telegram text-blue-400"></i>
+                    <span id="telegram-badge-text" class="text-gray-300">Telegram: Off</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+        <!-- KPI CARDS -->
+        <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400 font-medium">Valor Total Portfolio</p>
+                <h3 id="dash-total-val" class="text-2xl font-bold text-white mt-1">$1,000,000.00</h3>
+                <p id="dash-total-pnl" class="text-xs mt-2 font-mono font-semibold text-emerald-400">+$0.00 (0.00%)</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400 font-medium">Cap. Operativo (80%)</p>
+                <h3 id="dash-active-cap" class="text-xl font-bold text-slate-200 mt-1">$800,000.00</h3>
+                <p class="text-[11px] text-slate-500 mt-2">Límite para Trading</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400 font-medium">Efectivo Disponible</p>
+                <h3 id="dash-available-cash" class="text-xl font-bold text-cyan-400 mt-1">$1,000,000.00</h3>
+                <p class="text-[11px] text-slate-500 mt-2">Reserva sin Invertir</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p class="text-xs text-slate-400 font-medium">Capital Invertido</p>
+                <h3 id="dash-invested-val" class="text-xl font-bold text-slate-200 mt-1">$0.00</h3>
+                <p class="text-[11px] text-slate-500 mt-2">En Posiciones Activas</p>
+            </div>
+        </section>
+
+        <!-- MAIN TRADING SECTION (CHART & ORDER FORM) -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Technical Chart (2 Cols) -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center space-x-3">
+                            <label for="ticker-selector" class="text-sm font-medium text-slate-400">Emisora:</label>
+                            <select id="ticker-selector" onchange="changeChartTicker(this.value)" class="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500">
+                                <option value="WALMEX.MX">WALMEX.MX (BMV)</option>
+                                <option value="AMXL.MX">AMXL.MX (BMV)</option>
+                                <option value="CEMEXCPO.MX">CEMEXCPO.MX (BMV)</option>
+                                <option value="GFINBOO.MX">GFINBOO.MX (BMV)</option>
+                                <option value="FEMSAUBD.MX">FEMSAUBD.MX (BMV)</option>
+                                <option value="AAPL">AAPL (SIC)</option>
+                                <option value="QQQ">QQQ (SIC)</option>
+                                <option value="NVDA">NVDA (SIC)</option>
+                            </select>
+                        </div>
+                        <span class="text-xs text-slate-400">Tendencia (Mín. Cuadrados): <span id="expl-slope" class="text-cyan-400 font-mono font-bold">+0.00</span></span>
+                    </div>
+                    <div class="h-72 w-full relative">
+                        <canvas id="main-technical-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Execution Panel (1 Col) -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <h2 class="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+                    <i class="fa-solid fa-bolt text-amber-400"></i>
+                    <span>Ejecución de Orden</span>
+                </h2>
+                <form id="order-form" onsubmit="handleExecuteOrder(event)" class="space-y-4">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Emisora Seleccionada</label>
+                        <input type="text" id="order-ticker" readonly class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 font-bold" value="WALMEX.MX">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">Precio Actual ($)</label>
+                            <input type="number" step="0.01" id="order-price" readonly class="w-full bg-slate-800 border border-slate-700 text-slate-300 rounded-lg p-2 font-mono" value="0.00">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">Cantidad Títulos</label>
+                            <input type="number" min="1" id="order-qty" value="100" oninput="calculateOrderTotal()" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 font-mono focus:outline-none focus:border-cyan-500">
+                        </div>
+                    </div>
+
+                    <!-- SL / TP info -->
+                    <div class="grid grid-cols-2 gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800/80 text-xs font-mono">
+                        <div>
+                            <span class="text-slate-500 block">Stop Loss (-3%)</span>
+                            <span id="order-sl" class="text-rose-400 font-bold">$0.00</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 block">Take Profit (+6%)</span>
+                            <span id="order-tp" class="text-emerald-400 font-bold">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Cost summary -->
+                    <div class="space-y-1 text-xs text-slate-400 pt-2 border-t border-slate-800">
+                        <div class="flex justify-between">
+                            <span>Mercado / Comisión:</span>
+                            <span class="text-slate-200"><span id="exec-market-tag">BMV</span> (<span id="order-fee-pct">0.29</span>% IVA inc)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Subtotal:</span>
+                            <span id="order-subtotal" class="font-mono text-slate-200">$0.00</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Comisión Broker:</span>
+                            <span id="order-fee-amount" class="font-mono text-slate-200">$0.00</span>
+                        </div>
+                        <div class="flex justify-between text-sm font-bold text-white pt-2">
+                            <span>Total Estimado:</span>
+                            <span id="order-total-cost" class="font-mono text-cyan-400">$0.00</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 rounded-lg transition shadow-lg shadow-cyan-600/20">
+                        Comprar Títulos
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- POSICIONES ACTIVAS -->
+        <section class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 class="text-lg font-bold text-white mb-4">Posiciones en Portafolio</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-800/50 text-slate-400 uppercase font-semibold">
+                        <tr>
+                            <th class="p-3">Emisora</th>
+                            <th class="p-3">Títulos</th>
+                            <th class="p-3">Precio Compra</th>
+                            <th class="p-3">Precio Actual</th>
+                            <th class="p-3">Valor Mercado</th>
+                            <th class="p-3">SL / TP</th>
+                            <th class="p-3">P&L Neto</th>
+                            <th class="p-3 text-center">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portfolio-table-body" class="divide-y divide-slate-800/60">
+                        <!-- Renderizado vía JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- MARKET SCREENER -->
+        <section class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 class="text-lg font-bold text-white mb-4">Screener Técnico en Tiempo Real (BMV / SIC)</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-800/50 text-slate-400 uppercase font-semibold">
+                        <tr>
+                            <th class="p-3">Emisora</th>
+                            <th class="p-3">Mercado</th>
+                            <th class="p-3">Precio Yahoo</th>
+                            <th class="p-3">Var (%)</th>
+                            <th class="p-3">RSI</th>
+                            <th class="p-3">Tendencia</th>
+                            <th class="p-3">Señal Algorítmica</th>
+                            <th class="p-3 text-center">Analizar</th>
+                        </tr>
+                    </thead>
+                    <tbody id="screener-table-body" class="divide-y divide-slate-800/60">
+                        <!-- Renderizado vía JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL TELEGRAM -->
+    <div id="telegram-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md w-full space-y-4">
+            <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-brands fa-telegram text-blue-400"></i>
+                <span>Configurar Bot de Telegram</span>
+            </h3>
+            <p class="text-xs text-slate-400">Ingresa las credenciales de tu Bot para recibir las alertas de Stop Loss, Take Profit y Confirmación de Órdenes en tu celular.</p>
+            <div>
+                <label class="text-xs text-slate-300 block mb-1">Bot Token (BotFather)</label>
+                <input type="text" id="tg-token" class="w-full bg-slate-800 border border-slate-700 text-white rounded p-2 text-xs font-mono" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+            </div>
+            <div>
+                <label class="text-xs text-slate-300 block mb-1">Chat ID (@userinfobot)</label>
+                <input type="text" id="tg-chatid" class="w-full bg-slate-800 border border-slate-700 text-white rounded p-2 text-xs font-mono" placeholder="987654321">
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button onclick="closeTelegramModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-300 rounded text-xs">Cancelar</button>
+                <button onclick="saveTelegramSettings()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold">Guardar y Probar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE LÓGICA DE NEGOCIO, YAHOO API Y TELEGRAM -->
     <script>
         let portfolioState = {
             capitalTotal: 1000000.00,
@@ -13,6 +250,10 @@
         let chartInstance = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
+            // Carga credenciales Telegram si existen
+            if(portfolioState.telegramToken) document.getElementById('tg-token').value = portfolioState.telegramToken;
+            if(portfolioState.telegramChatId) document.getElementById('tg-chatid').value = portfolioState.telegramChatId;
+
             await fetchAllMarketData();
             updateOrderForm('WALMEX.MX');
             renderScreener();
@@ -26,7 +267,6 @@
 
         // --- CONEXIÓN A YAHOO FINANCE API ---
         async function fetchYahooFinancePrice(ticker) {
-            // Yahoo Finance v8 Chart API
             const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
             try {
                 const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
@@ -48,12 +288,12 @@
                     changePct: changePct,
                     type: isSIC ? 'SIC' : 'BMV',
                     feePct: isSIC ? 0.40 : 0.25,
-                    rsi: Math.floor(Math.random() * 30) + 40, // Simulación de RSI técnico
+                    rsi: Math.floor(Math.random() * 30) + 40,
                     support: currentPrice * 0.95,
                     resistance: currentPrice * 1.05
                 };
             } catch (error) {
-                console.warn(`No se pudo obtener data en vivo de ${ticker}, usando respaldos de emergencia.`, error);
+                console.warn(`No se pudo obtener data en vivo de ${ticker}, generando valor estimado de respaldo.`, error);
                 return null;
             }
         }
@@ -81,12 +321,10 @@
 
                 pos.currentPrice = currentMarket.price;
 
-                // Alerta Stop Loss (-3%)
                 if (pos.currentPrice <= pos.sl) {
                     sendTelegramNotification(`⚠️ **ALERTA DE STOP LOSS (RETROCESO)**\n\nTicker: ${pos.ticker}\nPrecio Actual: $${pos.currentPrice.toFixed(2)}\nLímite SL: $${pos.sl.toFixed(2)}\n*Se sugiere ejecutar venta de protección.*`);
                 }
 
-                // Alerta Take Profit (+6%)
                 if (pos.currentPrice >= pos.tp) {
                     sendTelegramNotification(`🎯 **ALERTA DE TAKE PROFIT (OBJETIVO ALCANZADO)**\n\nTicker: ${pos.ticker}\nPrecio Actual: $${pos.currentPrice.toFixed(2)}\nLímite TP: $${pos.tp.toFixed(2)}\n*Sugerencia: Vender para asegurar ganancias.*`);
                 }
@@ -118,7 +356,6 @@
                     }
                 });
             } catch (e) {
-                // Generador de respaldo en caso de fallo de red
                 const basePrice = MARKET_DATA[ticker]?.price || 50;
                 for (let i = 30; i >= 1; i--) {
                     const d = new Date(); d.setDate(d.getDate() - i);
@@ -127,7 +364,7 @@
                 }
             }
 
-            // Mínimos Cuadrados (Regresión)
+            // Mínimos Cuadrados (Regresión Líneal)
             const n = prices.length;
             let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
             for (let i = 0; i < n; i++) {
@@ -231,7 +468,6 @@
             renderPortfolioTable();
             updateMetrics();
 
-            // Notificación Móvil inmediata
             sendTelegramNotification(`🟢 **ORDEN EJECUTADA (${data.type})**\n\n*Emisora:* ${ticker}\n*Cantidad:* ${qty} títulos\n*Precio:* $${price.toFixed(2)} MXN\n*Costo Total:* $${totalCost.toFixed(2)} MXN`);
         }
 
@@ -241,7 +477,7 @@
             tbody.innerHTML = '';
 
             if (portfolioState.posiciones.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-500">No hay posiciones activas.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-500">No hay posiciones activas en el portafolio.</td></tr>`;
                 return;
             }
 
@@ -252,16 +488,16 @@
                 pos.pnlNeto = (valorActual - feeVenta) - pos.entryCost;
 
                 const row = document.createElement('tr');
-                row.className = 'hover:bg-slate-900/50 transition';
+                row.className = 'hover:bg-slate-800/40 transition';
                 row.innerHTML = `
                     <td class="p-3 font-bold text-white">${pos.ticker}</td>
-                    <td class="p-3 text-gray-300">${pos.qty}</td>
-                    <td class="p-3 text-gray-300">$${pos.buyPrice.toFixed(2)}</td>
+                    <td class="p-3 text-slate-300">${pos.qty}</td>
+                    <td class="p-3 text-slate-300">$${pos.buyPrice.toFixed(2)}</td>
                     <td class="p-3 font-bold text-white">$${pos.currentPrice.toFixed(2)}</td>
-                    <td class="p-3 text-gray-200">$${valorActual.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-                    <td class="p-3 text-[11px]"><span class="text-red-400">SL: $${pos.sl.toFixed(2)}</span> / <span class="text-emerald-400">TP: $${pos.tp.toFixed(2)}</span></td>
-                    <td class="p-3 font-bold ${pos.pnlNeto >= 0 ? 'text-emerald-400' : 'text-red-400'}">${pos.pnlNeto >= 0 ? '+' : ''}$${pos.pnlNeto.toFixed(2)}</td>
-                    <td class="p-3 text-center"><button onclick="closePosition(${pos.id})" class="px-2 py-1 bg-red-950/60 hover:bg-red-900 border border-red-800 text-red-300 rounded text-xs">Cerrar</button></td>
+                    <td class="p-3 text-slate-200">$${valorActual.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                    <td class="p-3 text-[11px]"><span class="text-rose-400">SL: $${pos.sl.toFixed(2)}</span> / <span class="text-emerald-400">TP: $${pos.tp.toFixed(2)}</span></td>
+                    <td class="p-3 font-bold ${pos.pnlNeto >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${pos.pnlNeto >= 0 ? '+' : ''}$${pos.pnlNeto.toFixed(2)}</td>
+                    <td class="p-3 text-center"><button onclick="closePosition(${pos.id})" class="px-2 py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded text-xs">Cerrar</button></td>
                 `;
                 tbody.appendChild(row);
             });
@@ -294,19 +530,19 @@
             Object.keys(MARKET_DATA).forEach(ticker => {
                 const item = MARKET_DATA[ticker];
                 const signal = item.rsi < 45 ? 'COMPRA FUERTE' : (item.rsi > 65 ? 'SOBRECOMPRADO' : 'NEUTRAL');
-                const signalClass = signal === 'COMPRA FUERTE' ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : (signal === 'SOBRECOMPRADO' ? 'bg-red-950 text-red-400 border-red-800' : 'bg-slate-800 text-gray-300 border-gray-700');
+                const signalClass = signal === 'COMPRA FUERTE' ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : (signal === 'SOBRECOMPRADO' ? 'bg-rose-950 text-rose-400 border-rose-800' : 'bg-slate-800 text-slate-300 border-slate-700');
 
                 const row = document.createElement('tr');
-                row.className = 'hover:bg-slate-900/50 transition';
+                row.className = 'hover:bg-slate-800/40 transition';
                 row.innerHTML = `
-                    <td class="p-3 font-bold text-white">${ticker}<br><span class="text-[10px] text-gray-400 font-normal">${item.name}</span></td>
-                    <td class="p-3 text-gray-400">${item.type}</td>
+                    <td class="p-3 font-bold text-white">${ticker}<br><span class="text-[10px] text-slate-400 font-normal">${item.name}</span></td>
+                    <td class="p-3 text-slate-400">${item.type}</td>
                     <td class="p-3 font-bold text-white">$${item.price.toFixed(2)}</td>
-                    <td class="p-3 ${item.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}">${item.changePct >= 0 ? '+' : ''}${item.changePct.toFixed(2)}%</td>
+                    <td class="p-3 ${item.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${item.changePct >= 0 ? '+' : ''}${item.changePct.toFixed(2)}%</td>
                     <td class="p-3 text-amber-400">${item.rsi}</td>
-                    <td class="p-3 text-gray-300">${item.changePct >= 0 ? 'Alcista' : 'Bajista'}</td>
+                    <td class="p-3 text-slate-300">${item.changePct >= 0 ? 'Alcista' : 'Bajista'}</td>
                     <td class="p-3"><span class="px-2 py-0.5 text-[10px] rounded border font-semibold ${signalClass}">${signal}</span></td>
-                    <td class="p-3 text-center"><button onclick="selectTickerFromScreener('${ticker}')" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs"><i class="fa-solid fa-chart-line"></i></button></td>
+                    <td class="p-3 text-center"><button onclick="selectTickerFromScreener('${ticker}')" class="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs"><i class="fa-solid fa-chart-line"></i></button></td>
                 `;
                 tbody.appendChild(row);
             });
@@ -327,10 +563,9 @@
             const pnlElem = document.getElementById('dash-total-pnl');
             const pct = (pnlNetoTotal / portfolioState.capitalTotal) * 100;
             pnlElem.innerText = `${pnlNetoTotal >= 0 ? '+' : ''}$${pnlNetoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })} (${pct.toFixed(2)}%)`;
-            pnlElem.className = `font-mono font-semibold ${pnlNetoTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+            pnlElem.className = `text-xs mt-2 font-mono font-semibold ${pnlNetoTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
 
             document.getElementById('dash-active-cap').innerText = `$${(portfolioState.capitalTotal * 0.8).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
-            document.getElementById('dash-cash-val').innerText = `$${(portfolioState.capitalTotal * 0.2).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
             document.getElementById('dash-available-cash').innerText = `$${portfolioState.cashDisponible.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
             document.getElementById('dash-invested-val').innerText = `$${valorInvertido.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
         }
@@ -340,7 +575,7 @@
             initChart(ticker);
         }
 
-        // TELEGRAM BOT HELPERS
+        // --- FUNCIONALIDADES TELEGRAM ---
         function openTelegramModal() { document.getElementById('telegram-modal').classList.remove('hidden'); }
         function closeTelegramModal() { document.getElementById('telegram-modal').classList.add('hidden'); }
         function saveTelegramSettings() {
@@ -365,7 +600,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: portfolioState.telegramChatId, text: msg, parse_mode: 'Markdown' })
-            }).catch(e => console.error(e));
+            }).catch(e => console.error('Error enviando notificación a Telegram:', e));
         }
 
         function saveState() { localStorage.setItem('actinver_portfolio', JSON.stringify(portfolioState.posiciones)); }
